@@ -1,9 +1,35 @@
 ## Cursor Cloud specific instructions
 
-This repository is currently empty (placeholder). It contains a single file `1` with no application code, dependencies, build system, or services.
+### Project Overview
 
-- **No dependencies** to install.
-- **No lint, test, or build** commands available.
-- **No services** to start or run.
+This is a banking internal management system (银行内部管理系统) with two services:
 
-Once actual application code is added, this section should be updated with relevant development instructions.
+| Service | Directory | Port | Stack |
+|---------|-----------|------|-------|
+| Backend API | `backend/` | 3000 | Express + TypeScript + Prisma + SQLite |
+| Frontend Web | `frontend/` | 5173 | React + Vite + Ant Design |
+
+### Running Services
+
+- **Backend**: `npm run dev` in `backend/` — auto-reloads via `tsx watch`
+- **Frontend**: `npm run dev` in `frontend/` — Vite dev server with HMR, proxies `/api` to backend
+- **Both**: `npm run dev` at root (uses `concurrently`)
+
+### Database
+
+- SQLite database at `backend/prisma/dev.db`
+- Migrations: `cd backend && npx prisma migrate dev`
+- Seed data: `cd backend && npx tsx prisma/seed.ts`
+- Default admin login: `admin` / `admin123`; other users: password `123456`
+
+### Key Commands
+
+- **Lint (frontend)**: `cd frontend && npm run lint`
+- **Type check (backend)**: `cd backend && npx tsc --noEmit`
+- **Build**: `npm run build` at root
+
+### Caveats
+
+- SQLite does not support `skipDuplicates` in `createMany` — use `upsert` loops instead.
+- `@types/express@5` treats `req.params` values as `string | string[]`; wrap with `String()` before `parseInt`.
+- Frontend proxies `/api` requests to `http://localhost:3000` — backend must be running for the frontend to function.

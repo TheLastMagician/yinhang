@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  name      String
+  role      String   // ADMIN, MANAGER, TELLER, AUDITOR
+  email     String?
+  phone     String?
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  auditLogs AuditLog[]
+}
+
+model Customer {
+  id        Int       @id @default(autoincrement())
+  name      String
+  idType    String    // ID_CARD, PASSPORT
+  idNumber  String    @unique
+  phone     String
+  email     String?
+  address   String?
+  gender    String?
+  birthDate DateTime?
+  status    String    @default("ACTIVE")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  accounts Account[]
+  loans    Loan[]
+}
+
+model Account {
+  id            Int      @id @default(autoincrement())
+  accountNumber String   @unique
+  customerId    Int
+  customer      Customer @relation(fields: [customerId], references: [id])
+  type          String   // SAVINGS, CHECKING, FIXED_DEPOSIT
+  balance       Float    @default(0)
+  currency      String   @default("CNY")
+  status        String   @default("ACTIVE")
+  openDate      DateTime @default(now())
+  closeDate     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  transactionsFrom Transaction[] @relation("FromAccount")
+  transactionsTo   Transaction[] @relation("ToAccount")
+}
+
+model Transaction {
+  id            Int      @id @default(autoincrement())
+  transactionNo String   @unique
+  type          String   // DEPOSIT, WITHDRAWAL, TRANSFER
+  amount        Float
+  fromAccountId Int?
+  fromAccount   Account? @relation("FromAccount", fields: [fromAccountId], references: [id])
+  toAccountId   Int?
+  toAccount     Account? @relation("ToAccount", fields: [toAccountId], references: [id])
+  description   String?
+  status        String   @default("COMPLETED")
+  operatorId    Int?
+  createdAt     DateTime @default(now())
+}
+
+model Loan {
+  id           Int       @id @default(autoincrement())
+  loanNumber   String    @unique
+  customerId   Int
+  customer     Customer  @relation(fields: [customerId], references: [id])
+  amount       Float
+  interestRate Float
+  term         Int
+  type         String    // PERSONAL, MORTGAGE, BUSINESS
+  status       String    @default("PENDING")
+  purpose      String?
+  approvedBy   Int?
+  approvedAt   DateTime?
+  startDate    DateTime?
+  endDate      DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  repayments LoanRepayment[]
+}
+
+model LoanRepayment {
+  id        Int       @id @default(autoincrement())
+  loanId    Int
+  loan      Loan      @relation(fields: [loanId], references: [id])
+  amount    Float
+  principal Float
+  interest  Float
+  dueDate   DateTime
+  paidDate  DateTime?
+  status    String    @default("PENDING")
+  createdAt DateTime  @default(now())
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  module    String
+  target    String?
+  detail    String?
+  ip        String?
+  createdAt DateTime @default(now())
+}
