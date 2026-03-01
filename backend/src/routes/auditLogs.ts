@@ -1,11 +1,10 @@
 import { Router, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../utils/prisma';
 import { paginate, error } from '../utils/response';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { getPaginationParams } from '../utils/helpers';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 router.use(authenticate);
 router.use(authorize('ADMIN', 'MANAGER', 'AUDITOR'));
@@ -16,14 +15,17 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const where: any = {};
 
     if (req.query.module) where.module = req.query.module;
-    if (req.query.action) where.action = { contains: req.query.action as string };
+    if (req.query.action) where.action = { contains: String(req.query.action) };
     if (req.query.userId) where.userId = parseInt(String(req.query.userId));
+    if (req.query.startDate || req.query.endDate) {
+      where.createdAt = {};
+      if (req.query.startDate) where.createdAt.gte = new Date(String(req.query.startDate));
+      if (req.query.endDate) where.createdAt.lte = new Date(String(req.query.endDate));
+    }
 
     const [logs, total] = await Promise.all([
       prisma.auditLog.findMany({
-        where,
-        skip,
-        take,
+        where, skip, take,
         orderBy: { createdAt: 'desc' },
         include: { user: { select: { id: true, name: true, username: true } } },
       }),

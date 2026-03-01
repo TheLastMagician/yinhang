@@ -9,8 +9,11 @@ export default function Users() {
   const [loading, setLoading] = useState(false);
   const [params, setParams] = useState({ page: 1, pageSize: 10, keyword: '' });
   const [modalOpen, setModalOpen] = useState(false);
+  const [resetPwdOpen, setResetPwdOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [resetUserId, setResetUserId] = useState<number | null>(null);
   const [form] = Form.useForm();
+  const [resetForm] = Form.useForm();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -46,22 +49,40 @@ export default function Users() {
     fetchData();
   };
 
+  const handleResetPassword = async () => {
+    const values = await resetForm.validateFields();
+    if (resetUserId) {
+      await userApi.resetPassword(resetUserId, values);
+      message.success('密码重置成功');
+      setResetPwdOpen(false);
+      resetForm.resetFields();
+    }
+  };
+
+  const handleUnlock = async (id: number) => {
+    await userApi.unlock(id);
+    message.success('账号已解锁');
+    fetchData();
+  };
+
   const roleMap: any = { ADMIN: { color: 'red', text: '管理员' }, MANAGER: { color: 'blue', text: '经理' }, TELLER: { color: 'green', text: '柜员' }, AUDITOR: { color: 'purple', text: '审计' } };
 
   const columns = [
-    { title: 'ID', dataIndex: 'id', width: 60 },
-    { title: '用户名', dataIndex: 'username', width: 120 },
-    { title: '姓名', dataIndex: 'name', width: 100 },
-    { title: '角色', dataIndex: 'role', width: 100, render: (v: string) => <Tag color={roleMap[v]?.color}>{roleMap[v]?.text}</Tag> },
-    { title: '邮箱', dataIndex: 'email', width: 180 },
-    { title: '电话', dataIndex: 'phone', width: 130 },
-    { title: '状态', dataIndex: 'status', width: 80, render: (v: string) => <Tag color={v === 'ACTIVE' ? 'green' : 'default'}>{v === 'ACTIVE' ? '启用' : '禁用'}</Tag> },
-    { title: '创建时间', dataIndex: 'createdAt', width: 160, render: (v: string) => dayjs(v).format('YYYY-MM-DD HH:mm') },
+    { title: 'ID', dataIndex: 'id', width: 50 },
+    { title: '用户名', dataIndex: 'username', width: 100 },
+    { title: '姓名', dataIndex: 'name', width: 80 },
+    { title: '角色', dataIndex: 'role', width: 80, render: (v: string) => <Tag color={roleMap[v]?.color}>{roleMap[v]?.text}</Tag> },
+    { title: '邮箱', dataIndex: 'email', width: 160 },
+    { title: '电话', dataIndex: 'phone', width: 120 },
+    { title: '状态', dataIndex: 'status', width: 70, render: (v: string) => <Tag color={v === 'ACTIVE' ? 'green' : 'default'}>{v === 'ACTIVE' ? '启用' : '禁用'}</Tag> },
+    { title: '最后登录', dataIndex: 'lastLoginAt', width: 140, render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-' },
     {
-      title: '操作', width: 120, fixed: 'right' as const,
+      title: '操作', width: 220, fixed: 'right' as const,
       render: (_: any, record: any) => (
         <Space size="small">
           <Button type="link" size="small" onClick={() => { setEditingId(record.id); form.setFieldsValue(record); setModalOpen(true); }}>编辑</Button>
+          <Button type="link" size="small" onClick={() => { setResetUserId(record.id); resetForm.resetFields(); setResetPwdOpen(true); }}>重置密码</Button>
+          <Button type="link" size="small" onClick={() => handleUnlock(record.id)}>解锁</Button>
           <Popconfirm title="确定删除？" onConfirm={() => handleDelete(record.id)}>
             <Button type="link" size="small" danger>删除</Button>
           </Popconfirm>
@@ -75,13 +96,13 @@ export default function Users() {
       title="用户管理"
       extra={
         <Space>
-          <Input placeholder="搜索用户名/姓名" prefix={<SearchOutlined />} value={params.keyword}
-            onChange={(e) => setParams({ ...params, keyword: e.target.value, page: 1 })} style={{ width: 200 }} allowClear />
+          <Input placeholder="搜索" prefix={<SearchOutlined />} value={params.keyword}
+            onChange={(e) => setParams({ ...params, keyword: e.target.value, page: 1 })} style={{ width: 180 }} allowClear />
           <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingId(null); form.resetFields(); setModalOpen(true); }}>新增用户</Button>
         </Space>
       }
     >
-      <Table columns={columns} dataSource={data.list} rowKey="id" loading={loading} scroll={{ x: 1000 }}
+      <Table columns={columns} dataSource={data.list} rowKey="id" loading={loading} scroll={{ x: 1100 }}
         pagination={{ current: params.page, pageSize: params.pageSize, total: data.total, showSizeChanger: true, showTotal: (t) => `共 ${t} 条`,
           onChange: (p, ps) => setParams({ ...params, page: p, pageSize: ps }) }} />
 
@@ -89,17 +110,11 @@ export default function Users() {
         <Form form={form} layout="vertical">
           {!editingId && (
             <>
-              <Form.Item name="username" label="用户名" rules={[{ required: true }]}>
-                <Input />
-              </Form.Item>
-              <Form.Item name="password" label="密码" rules={[{ required: true, min: 6 }]}>
-                <Input.Password />
-              </Form.Item>
+              <Form.Item name="username" label="用户名" rules={[{ required: true }]}><Input /></Form.Item>
+              <Form.Item name="password" label="密码" rules={[{ required: true, min: 6 }]}><Input.Password /></Form.Item>
             </>
           )}
-          <Form.Item name="name" label="姓名" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
+          <Form.Item name="name" label="姓名" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="role" label="角色" rules={[{ required: true }]}>
             <Select options={[{ value: 'ADMIN', label: '管理员' }, { value: 'MANAGER', label: '经理' }, { value: 'TELLER', label: '柜员' }, { value: 'AUDITOR', label: '审计' }]} />
           </Form.Item>
@@ -110,6 +125,14 @@ export default function Users() {
               <Select options={[{ value: 'ACTIVE', label: '启用' }, { value: 'INACTIVE', label: '禁用' }]} />
             </Form.Item>
           )}
+        </Form>
+      </Modal>
+
+      <Modal title="重置密码" open={resetPwdOpen} onOk={handleResetPassword} onCancel={() => setResetPwdOpen(false)} width={400}>
+        <Form form={resetForm} layout="vertical">
+          <Form.Item name="newPassword" label="新密码" rules={[{ required: true, min: 6 }]}>
+            <Input.Password />
+          </Form.Item>
         </Form>
       </Modal>
     </Card>

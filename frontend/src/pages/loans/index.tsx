@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Table, Button, Tag, Space, Modal, Form, Select, InputNumber, Input, message, Popconfirm, Descriptions } from 'antd';
+import { Card, Table, Button, Tag, Space, Modal, Form, Select, InputNumber, Input, message, Popconfirm, Descriptions, Progress } from 'antd';
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
-import { loanApi, customerApi } from '@/api';
+import { loanApi, customerApi, accountApi } from '@/api';
 import dayjs from 'dayjs';
 
 export default function Loans() {
@@ -10,9 +10,15 @@ export default function Loans() {
   const [params, setParams] = useState({ page: 1, pageSize: 10, status: '', keyword: '' });
   const [modalOpen, setModalOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [disburseOpen, setDisburseOpen] = useState(false);
+  const [repayOpen, setRepayOpen] = useState(false);
   const [detail, setDetail] = useState<any>(null);
   const [customers, setCustomers] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [selectedRepayment, setSelectedRepayment] = useState<any>(null);
   const [form] = Form.useForm();
+  const [disburseForm] = Form.useForm();
+  const [repayForm] = Form.useForm();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -59,31 +65,58 @@ export default function Loans() {
     setDetailOpen(true);
   };
 
-  const statusMap: any = {
-    PENDING: { color: 'orange', text: '待审批' },
-    APPROVED: { color: 'green', text: '已批准' },
-    REJECTED: { color: 'red', text: '已拒绝' },
-    ACTIVE: { color: 'blue', text: '还款中' },
-    COMPLETED: { color: 'default', text: '已结清' },
-    OVERDUE: { color: 'volcano', text: '逾期' },
+  const openDisburse = async (loan: any) => {
+    const res: any = await accountApi.list({ customerId: loan.customerId, status: 'ACTIVE', pageSize: 100 });
+    setAccounts(res.data.list);
+    setDetail(loan);
+    disburseForm.resetFields();
+    setDisburseOpen(true);
   };
 
+  const handleDisburse = async () => {
+    const values = await disburseForm.validateFields();
+    await loanApi.disburse(detail.id, values);
+    message.success('放款成功');
+    setDisburseOpen(false);
+    fetchData();
+  };
+
+  const openRepay = async (loan: any, repayment: any) => {
+    const res: any = await accountApi.list({ customerId: loan.customerId, status: 'ACTIVE', pageSize: 100 });
+    setAccounts(res.data.list);
+    setSelectedRepayment(repayment);
+    repayForm.resetFields();
+    repayForm.setFieldsValue({ amount: repayment.amount + repayment.penalty });
+    setRepayOpen(true);
+  };
+
+  const handleRepay = async () => {
+    const values = await repayForm.validateFields();
+    await loanApi.repay(detail.id, { repaymentId: selectedRepayment.id, ...values });
+    message.success('还款成功');
+    setRepayOpen(false);
+    showDetail(detail.id);
+    fetchData();
+  };
+
+  const statusMap: any = {
+    PENDING: { color: 'orange', text: '待审批' }, APPROVED: { color: 'blue', text: '已批准' },
+    REJECTED: { color: 'red', text: '已拒绝' }, ACTIVE: { color: 'green', text: '还款中' },
+    COMPLETED: { color: 'default', text: '已结清' }, OVERDUE: { color: 'volcano', text: '逾期' },
+  };
   const typeMap: any = { PERSONAL: '个人贷款', MORTGAGE: '房贷', BUSINESS: '经营贷' };
 
   const columns = [
-    { title: '贷款编号', dataIndex: 'loanNumber', width: 180 },
-    { title: '客户', dataIndex: ['customer', 'name'], width: 100 },
-    { title: '类型', dataIndex: 'type', width: 100, render: (v: string) => typeMap[v] || v },
+    { title: '贷款编号', dataIndex: 'loanNumber', width: 175 },
+    { title: '客户', dataIndex: ['customer', 'name'], width: 80 },
+    { title: '类型', dataIndex: 'type', width: 80, render: (v: string) => typeMap[v] || v },
+    { title: '金额', dataIndex: 'amount', width: 130, render: (v: number) => `¥${v.toLocaleString()}` },
+    { title: '利率(%)', dataIndex: 'interestRate', width: 80 },
+    { title: '期限(月)', dataIndex: 'term', width: 80 },
+    { title: '状态', dataIndex: 'status', width: 80, render: (v: string) => <Tag color={statusMap[v]?.color}>{statusMap[v]?.text}</Tag> },
+    { title: '申请时间', dataIndex: 'createdAt', width: 120, render: (v: string) => dayjs(v).format('YYYY-MM-DD') },
     {
-      title: '金额', dataIndex: 'amount', width: 140,
-      render: (v: number) => `¥${v.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`,
-    },
-    { title: '利率(%)', dataIndex: 'interestRate', width: 90 },
-    { title: '期限(月)', dataIndex: 'term', width: 90 },
-    { title: '状态', dataIndex: 'status', width: 90, render: (v: string) => <Tag color={statusMap[v]?.color}>{statusMap[v]?.text}</Tag> },
-    { title: '申请时间', dataIndex: 'createdAt', width: 160, render: (v: string) => dayjs(v).format('YYYY-MM-DD HH:mm') },
-    {
-      title: '操作', width: 180, fixed: 'right' as const,
+      title: '操作', width: 220, fixed: 'right' as const,
       render: (_: any, record: any) => (
         <Space size="small">
           <Button type="link" size="small" onClick={() => showDetail(record.id)}>详情</Button>
@@ -97,18 +130,33 @@ export default function Loans() {
               </Popconfirm>
             </>
           )}
+          {record.status === 'APPROVED' && (
+            <Button type="link" size="small" style={{ color: '#1677ff' }} onClick={() => openDisburse(record)}>放款</Button>
+          )}
         </Space>
       ),
     },
   ];
 
   const repayColumns = [
-    { title: '期数', render: (_: any, __: any, i: number) => i + 1, width: 60 },
+    { title: '期数', dataIndex: 'period', width: 50 },
     { title: '应还日期', dataIndex: 'dueDate', render: (v: string) => dayjs(v).format('YYYY-MM-DD') },
     { title: '应还金额', dataIndex: 'amount', render: (v: number) => `¥${v.toFixed(2)}` },
     { title: '本金', dataIndex: 'principal', render: (v: number) => `¥${v.toFixed(2)}` },
     { title: '利息', dataIndex: 'interest', render: (v: number) => `¥${v.toFixed(2)}` },
-    { title: '状态', dataIndex: 'status', render: (v: string) => <Tag color={v === 'PAID' ? 'green' : v === 'OVERDUE' ? 'red' : 'default'}>{v === 'PAID' ? '已还' : v === 'OVERDUE' ? '逾期' : '待还'}</Tag> },
+    { title: '罚息', dataIndex: 'penalty', render: (v: number) => v > 0 ? <span style={{ color: 'red' }}>¥{v.toFixed(2)}</span> : '-' },
+    {
+      title: '状态', dataIndex: 'status',
+      render: (v: string) => <Tag color={v === 'PAID' ? 'green' : v === 'OVERDUE' ? 'red' : 'default'}>{v === 'PAID' ? '已还' : v === 'OVERDUE' ? '逾期' : '待还'}</Tag>,
+    },
+    {
+      title: '操作', width: 80,
+      render: (_: any, record: any) => (
+        record.status !== 'PAID' && detail?.status === 'ACTIVE' ? (
+          <Button type="link" size="small" onClick={() => openRepay(detail, record)}>还款</Button>
+        ) : null
+      ),
+    },
   ];
 
   return (
@@ -128,7 +176,7 @@ export default function Loans() {
         pagination={{ current: params.page, pageSize: params.pageSize, total: data.total, showSizeChanger: true, showTotal: (t) => `共 ${t} 条`,
           onChange: (p, ps) => setParams({ ...params, page: p, pageSize: ps }) }} />
 
-      <Modal title="新建贷款申请" open={modalOpen} onOk={handleCreate} onCancel={() => setModalOpen(false)} width={500}>
+      <Modal title="新建贷款申请" open={modalOpen} onOk={handleCreate} onCancel={() => setModalOpen(false)} width={550}>
         <Form form={form} layout="vertical">
           <Form.Item name="customerId" label="客户" rules={[{ required: true }]}>
             <Select showSearch optionFilterProp="label"
@@ -146,16 +194,16 @@ export default function Loans() {
           <Form.Item name="term" label="期限 (月)" rules={[{ required: true, type: 'number', min: 1 }]}>
             <InputNumber style={{ width: '100%' }} min={1} max={360} />
           </Form.Item>
-          <Form.Item name="purpose" label="用途">
-            <Input.TextArea rows={2} />
-          </Form.Item>
+          <Form.Item name="purpose" label="用途"><Input.TextArea rows={2} /></Form.Item>
+          <Form.Item name="guarantor" label="担保人"><Input /></Form.Item>
+          <Form.Item name="collateral" label="抵押物"><Input /></Form.Item>
         </Form>
       </Modal>
 
-      <Modal title="贷款详情" open={detailOpen} onCancel={() => setDetailOpen(false)} footer={null} width={700}>
+      <Modal title="贷款详情" open={detailOpen} onCancel={() => setDetailOpen(false)} footer={null} width={800}>
         {detail && (
           <>
-            <Descriptions bordered size="small" column={2}>
+            <Descriptions bordered size="small" column={3}>
               <Descriptions.Item label="贷款编号">{detail.loanNumber}</Descriptions.Item>
               <Descriptions.Item label="客户">{detail.customer?.name}</Descriptions.Item>
               <Descriptions.Item label="类型">{typeMap[detail.type]}</Descriptions.Item>
@@ -164,15 +212,51 @@ export default function Loans() {
               <Descriptions.Item label="期限">{detail.term}个月</Descriptions.Item>
               <Descriptions.Item label="状态"><Tag color={statusMap[detail.status]?.color}>{statusMap[detail.status]?.text}</Tag></Descriptions.Item>
               <Descriptions.Item label="用途">{detail.purpose || '-'}</Descriptions.Item>
+              <Descriptions.Item label="担保人">{detail.guarantor || '-'}</Descriptions.Item>
+              <Descriptions.Item label="抵押物" span={2}>{detail.collateral || '-'}</Descriptions.Item>
             </Descriptions>
+
             {detail.repayments?.length > 0 && (
               <div style={{ marginTop: 16 }}>
-                <h4>还款计划</h4>
-                <Table columns={repayColumns} dataSource={detail.repayments} rowKey="id" pagination={false} size="small" scroll={{ y: 300 }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <h4 style={{ margin: 0 }}>还款计划 ({detail.paidCount || 0}/{detail.repayments.length} 已还)</h4>
+                  {detail.totalRepaid > 0 && (
+                    <Progress percent={Math.round((detail.totalRepaid / detail.amount) * 100)} size="small" style={{ width: 200 }} />
+                  )}
+                </div>
+                <Table columns={repayColumns} dataSource={detail.repayments} rowKey="id" pagination={false} size="small" scroll={{ y: 350 }} />
               </div>
             )}
           </>
         )}
+      </Modal>
+
+      <Modal title="贷款放款" open={disburseOpen} onOk={handleDisburse} onCancel={() => setDisburseOpen(false)} width={450}>
+        <p>将贷款金额 <strong>¥{detail?.amount?.toLocaleString()}</strong> 放款至客户账户</p>
+        <Form form={disburseForm} layout="vertical">
+          <Form.Item name="accountId" label="目标账户" rules={[{ required: true, message: '请选择放款账户' }]}>
+            <Select showSearch optionFilterProp="label"
+              options={accounts.map(a => ({ value: a.id, label: `${a.accountNumber} (余额: ¥${a.balance.toLocaleString()})` }))} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal title={`还款 - 第${selectedRepayment?.period}期`} open={repayOpen} onOk={handleRepay} onCancel={() => setRepayOpen(false)} width={450}>
+        {selectedRepayment && (
+          <div style={{ marginBottom: 16 }}>
+            <p>应还金额: ¥{selectedRepayment.amount.toFixed(2)}</p>
+            {selectedRepayment.penalty > 0 && <p style={{ color: 'red' }}>罚息: ¥{selectedRepayment.penalty.toFixed(2)}</p>}
+          </div>
+        )}
+        <Form form={repayForm} layout="vertical">
+          <Form.Item name="accountId" label="扣款账户" rules={[{ required: true }]}>
+            <Select showSearch optionFilterProp="label"
+              options={accounts.map(a => ({ value: a.id, label: `${a.accountNumber} (余额: ¥${a.balance.toLocaleString()})` }))} />
+          </Form.Item>
+          <Form.Item name="amount" label="还款金额">
+            <InputNumber style={{ width: '100%' }} min={0.01} precision={2} />
+          </Form.Item>
+        </Form>
       </Modal>
     </Card>
   );

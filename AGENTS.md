@@ -2,7 +2,7 @@
 
 ### Project Overview
 
-This is a banking internal management system (银行内部管理系统) with two services:
+This is a full-featured banking internal management system (银行内部管理系统) with two services:
 
 | Service | Directory | Port | Stack |
 |---------|-----------|------|-------|
@@ -33,3 +33,6 @@ This is a banking internal management system (银行内部管理系统) with two
 - SQLite does not support `skipDuplicates` in `createMany` — use `upsert` loops instead.
 - `@types/express@5` treats `req.params` values as `string | string[]`; wrap with `String()` before `parseInt`.
 - Frontend proxies `/api` requests to `http://localhost:3000` — backend must be running for the frontend to function.
+- PrismaClient is shared via `backend/src/utils/prisma.ts` singleton — do NOT create new instances in route files.
+- System configs are cached with 60s TTL in `backend/src/services/systemConfig.ts`; call `clearConfigCache()` when updating configs.
+- Large transactions (>= configurable threshold, default ¥50,000) trigger `PENDING_REVIEW` status and require manager approval.

@@ -8,33 +8,39 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  username  String   @unique
-  password  String
-  name      String
-  role      String   // ADMIN, MANAGER, TELLER, AUDITOR
-  email     String?
-  phone     String?
-  status    String   @default("ACTIVE")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            Int      @id @default(autoincrement())
+  username      String   @unique
+  password      String
+  name          String
+  role          String
+  email         String?
+  phone         String?
+  status        String   @default("ACTIVE")
+  failedLogins  Int      @default(0)
+  lockedUntil   DateTime?
+  lastLoginAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  auditLogs AuditLog[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
 }
 
 model Customer {
-  id        Int       @id @default(autoincrement())
-  name      String
-  idType    String    // ID_CARD, PASSPORT
-  idNumber  String    @unique
-  phone     String
-  email     String?
-  address   String?
-  gender    String?
-  birthDate DateTime?
-  status    String    @default("ACTIVE")
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id            Int       @id @default(autoincrement())
+  name          String
+  idType        String
+  idNumber      String    @unique
+  phone         String
+  email         String?
+  address       String?
+  gender        String?
+  birthDate     DateTime?
+  occupation    String?
+  riskLevel     String    @default("LOW")
+  status        String    @default("ACTIVE")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   accounts Account[]
   loans    Loan[]
@@ -45,9 +51,11 @@ model Account {
   accountNumber String   @unique
   customerId    Int
   customer      Customer @relation(fields: [customerId], references: [id])
-  type          String   // SAVINGS, CHECKING, FIXED_DEPOSIT
+  type          String
   balance       Float    @default(0)
   currency      String   @default("CNY")
+  interestRate  Float    @default(0)
+  dailyLimit    Float    @default(50000)
   status        String   @default("ACTIVE")
   openDate      DateTime @default(now())
   closeDate     DateTime?
@@ -61,15 +69,20 @@ model Account {
 model Transaction {
   id            Int      @id @default(autoincrement())
   transactionNo String   @unique
-  type          String   // DEPOSIT, WITHDRAWAL, TRANSFER
+  type          String
   amount        Float
+  fee           Float    @default(0)
   fromAccountId Int?
   fromAccount   Account? @relation("FromAccount", fields: [fromAccountId], references: [id])
   toAccountId   Int?
   toAccount     Account? @relation("ToAccount", fields: [toAccountId], references: [id])
+  balanceAfter  Float?
   description   String?
   status        String   @default("COMPLETED")
+  channel       String   @default("COUNTER")
   operatorId    Int?
+  reviewedBy    Int?
+  reviewedAt    DateTime?
   createdAt     DateTime @default(now())
 }
 
@@ -81,13 +94,17 @@ model Loan {
   amount       Float
   interestRate Float
   term         Int
-  type         String    // PERSONAL, MORTGAGE, BUSINESS
+  type         String
   status       String    @default("PENDING")
   purpose      String?
+  guarantor    String?
+  collateral   String?
   approvedBy   Int?
   approvedAt   DateTime?
   startDate    DateTime?
   endDate      DateTime?
+  disbursedAmount Float  @default(0)
+  repaidAmount    Float  @default(0)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -98,11 +115,14 @@ model LoanRepayment {
   id        Int       @id @default(autoincrement())
   loanId    Int
   loan      Loan      @relation(fields: [loanId], references: [id])
+  period    Int       @default(0)
   amount    Float
   principal Float
   interest  Float
   dueDate   DateTime
   paidDate  DateTime?
+  paidAmount Float    @default(0)
+  penalty   Float    @default(0)
   status    String    @default("PENDING")
   createdAt DateTime  @default(now())
 }
@@ -117,4 +137,26 @@ model AuditLog {
   detail    String?
   ip        String?
   createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  content   String
+  type      String   @default("INFO")
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+}
+
+model SystemConfig {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String
+  label     String
+  category  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

@@ -9,6 +9,9 @@ import transactionRoutes from './routes/transactions';
 import loanRoutes from './routes/loans';
 import dashboardRoutes from './routes/dashboard';
 import auditLogRoutes from './routes/auditLogs';
+import notificationRoutes from './routes/notifications';
+import systemConfigRoutes from './routes/systemConfig';
+import reportRoutes from './routes/reports';
 
 const app = express();
 
@@ -23,6 +26,9 @@ app.use('/api/transactions', transactionRoutes);
 app.use('/api/loans', loanRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/system-config', systemConfigRoutes);
+app.use('/api/reports', reportRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

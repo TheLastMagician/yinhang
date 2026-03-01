@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, Table, Button, Input, Tag, Space, Modal, Form, Select, DatePicker, message } from 'antd';
-import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, EyeOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { customerApi } from '@/api';
 import dayjs from 'dayjs';
 
@@ -11,6 +12,7 @@ export default function Customers() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form] = Form.useForm();
+  const navigate = useNavigate();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -76,9 +78,12 @@ export default function Customers() {
       render: (v: string) => dayjs(v).format('YYYY-MM-DD HH:mm'),
     },
     {
-      title: '操作', width: 80, fixed: 'right' as const,
+      title: '操作', width: 120, fixed: 'right' as const,
       render: (_: any, record: any) => (
-        <Button type="link" size="small" onClick={() => openEdit(record)}>编辑</Button>
+        <Space size="small">
+          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => navigate(`/customers/${record.id}`)}>详情</Button>
+          <Button type="link" size="small" onClick={() => openEdit(record)}>编辑</Button>
+        </Space>
       ),
     },
   ];
